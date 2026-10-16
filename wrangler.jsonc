@@ -1,0 +1,29 @@
+{
+  "name": "bodriostars",
+  "main": "index.js",
+  "compatibility_date": "2025-06-01",
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "CUENTAS",
+        "class_name": "Cuentas"
+      },
+      {
+        "name": "SALAS",
+        "class_name": "Sala"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "Cuentas",
+        "Sala"
+      ]
+    }
+  ],
+  "observability": {
+    "enabled": true
+  }
+}
