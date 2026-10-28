@@ -81,6 +81,17 @@ export class Cuentas {
       this.salas.set(c, { code: c, host: '?', players: 0, max: MAX_SALA, playing: false, visto: Date.now() });
       return json({ code: c });
     }
+    /* ---- pedidos de otros juegos (CubeWorld). Solo llegan por binding interno, no desde internet ---- */
+    if (url.pathname === '/verificar') {           // otro juego quiere entrar o crear una cuenta
+      const m = await req.json();
+      return json(await this.entrar(m.name, m.pass, typeof m.crear === 'boolean' ? m.crear : undefined));
+    }
+    if (url.pathname === '/buscar') {              // otro juego busca cuentas por nombre
+      const q = String(url.searchParams.get('q') || '').trim().slice(0, 14).replace(/[\\%_]/g, c => '\\' + c);
+      const filas = q.length < 1 ? [] : this.sql.exec(
+        "SELECT nombre FROM cuentas WHERE nombre LIKE ? ESCAPE '\\' ORDER BY nombre COLLATE NOCASE LIMIT 20", '%' + q + '%').toArray();
+      return json({ lista: filas.map(f => ({ name: f.nombre, bodrio: !!this.socketDe(f.nombre) })) });
+    }
     if (url.pathname === '/entrar') {              // una sala pregunta si esa cuenta existe
       const m = await req.json();
       const f = this.ficha(String(m.name || '').slice(0, 14));
@@ -120,7 +131,8 @@ export class Cuentas {
       .map(f => ({ name: f.nombre, partidas: f.partidas, ganadas: f.ganadas, kos: f.kos }));
   }
   ficha(nombre) {
-    return this.sql.exec('SELECT * FROM cuentas WHERE nombre = ?', nombre).toArray()[0] || null;
+    // sin distinguir mayúsculas: «Sebas» y «sebas» son la misma cuenta
+    return this.sql.exec('SELECT * FROM cuentas WHERE nombre = ? COLLATE NOCASE ORDER BY rowid LIMIT 1', nombre).toArray()[0] || null;
   }
   manda(f) { return !!(f && f.admin && !f.modo); }         // admin de verdad y no está mirando "como jugador"
   tengoDe(f) {
@@ -195,6 +207,7 @@ export class Cuentas {
       return { ok: true, name: nombre, nueva: true };
     }
     if (crear === true && f.pass) return { err: 'Ya hay una cuenta con ese nombre. Si es tuya, tocá «Entrar».' };
+    nombre = f.nombre;                               // usamos el nombre tal como se registró
     if (!f.pass) this.sql.exec('UPDATE cuentas SET pass = ? WHERE nombre = ?', h, nombre);  // cuenta vieja, sin contraseña: se queda con la primera que pongan
     else if (f.pass !== h) return { err: 'Contraseña incorrecta. Si no es tu cuenta, elegí otro nombre.' };
     if (esAdmin) this.sql.exec('UPDATE cuentas SET admin = 1, modo = 0 WHERE nombre = ?', nombre);  // entra siempre con todos los poderes
